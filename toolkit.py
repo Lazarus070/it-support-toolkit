@@ -6,14 +6,18 @@ Commands:
     python toolkit.py diagnose       -> checks whether the internet connection works
     python toolkit.py ping HOST      -> pings a host (Day 2)
     python toolkit.py lookup NAME    -> DNS lookup (Day 2)
+    python toolkit.py sysinfo        -> disk, memory and CPU health check (Day 3)
 
 Later days add: ticket (log and list support tickets) and kb (how-to articles).
 """
 
 import argparse
+import os
 import platform
 import socket
 import subprocess
+
+import psutil  # third-party: install with  pip install -r requirements.txt
 
 # Public DNS servers we can try to reach. 1.1.1.1 is Cloudflare, 8.8.8.8 is Google.
 # Port 53 is the port DNS uses.
@@ -117,6 +121,39 @@ def cmd_lookup(args):
     print_result(True, f"{args.name} resolves to {ip}", "")
 
 
+def cmd_sysinfo(args):
+    """Check disk, memory and CPU, and say in plain English if anything is a problem."""
+    print("Checking this computer...\n")
+
+    # Disk: look at the drive Python is running from (C:\\ on Windows, / on Linux/Mac).
+    disk = psutil.disk_usage(os.path.abspath(os.sep))
+    free_gb = disk.free / 1024**3
+    print_result(
+        disk.percent < 90,
+        f"Disk is {disk.percent:.0f}% full ({free_gb:.1f} GB free)",
+        "Empty the Recycle Bin, run Disk Cleanup, and uninstall programs nobody uses.",
+    )
+
+    # Memory (RAM): a full one makes the computer slow.
+    mem = psutil.virtual_memory()
+    print_result(
+        mem.percent < 90,
+        f"Memory is {mem.percent:.0f}% used",
+        "Close unused programs and browser tabs, then restart the computer.",
+    )
+
+    # CPU: measured over one second.
+    cpu = psutil.cpu_percent(interval=1)
+    print_result(
+        cpu < 90,
+        f"CPU is {cpu:.0f}% busy",
+        "Open Task Manager (Ctrl+Shift+Esc), sort by CPU, and look for the program using the most.",
+    )
+
+    print()
+    print(f"System: {platform.system()} {platform.release()}")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="IT Support Toolkit")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -132,6 +169,9 @@ def build_parser():
     p = sub.add_parser("lookup", help="turn a website name into an IP address")
     p.add_argument("name", help="e.g. google.com")
     p.set_defaults(func=cmd_lookup)
+    sub.add_parser("sysinfo", help="check disk, memory and CPU").set_defaults(
+        func=cmd_sysinfo
+    )
     return parser
 
 
